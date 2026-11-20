@@ -1,0 +1,314 @@
+/* ===== Адвент-календар · варіант «Стулки» ===== */
+
+:root {
+  /* Палітра */
+  --wood: #194b3e;            /* зелений фон за календарем */
+  --board: #FFFFFF;           /* біла дошка-основа */
+  --kraft: #E0B48E;           /* дверцята */
+  --kraft-edge: #C9976F;      /* рамка дверцят / зворот стулок */
+  --kraft-edge-dark: #B98660;
+  --red: #B51F27;             /* цифри на дверцятах (3.5:1 на крафті — лише для великого тексту) */
+  --red-dark: #8E141B;        /* заголовок, кнопки */
+  --red-inside: #9E1B22;      /* фон усередині віконця */
+  --gold: #F4D58D;
+  --cream: #FBEEDD;           /* текст завдання на червоному */
+  --ink: #4A2E1C;
+  --ink-soft: #5C4633;
+  --ink-label: #7A4E2E;
+  --focus: #1F4E8C;
+
+  /* Шрифти */
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Manrope', system-ui, sans-serif;
+
+  /* Сітка */
+  --cols: 6;
+  --row-h: 132px;
+  --gap: 14px;
+
+  /* Анімація */
+  --door-duration: 1s;
+  --door-ease: cubic-bezier(0.3, 0.7, 0.2, 1);
+  --door-angle: 118deg;
+  --reveal-delay: 0.35s;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background-color: var(--wood);
+  background-image: url('../images/forest-pattern.svg'), linear-gradient(145deg, #235b49, #12392f);
+  background-repeat: repeat, no-repeat;
+  background-size: 420px 420px, cover;
+}
+
+.page { padding: 24px 20px 64px; overflow-x: clip; }  /* відчинені стулки крайніх віконець не створюють горизонтального скролу */
+
+/* ---------- Дошка і сітка ---------- */
+.board {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 28px;
+  background: var(--board);
+  box-shadow: 0 30px 60px -20px rgba(74, 46, 28, 0.35), 0 2px 6px rgba(74, 46, 28, 0.12);
+}
+.preview-indicator { margin: 0 0 14px; color: var(--red-dark); font-size: 14px; font-weight: 700; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-auto-rows: var(--row-h);
+  gap: var(--gap);
+}
+.hint { max-width: 1120px; margin: 20px auto 0; text-align: center; font-size: 14px; color: var(--ink-soft); }
+
+/* ---------- Віконце ---------- */
+.cell {
+  position: relative;
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  overflow: visible;
+  perspective: 900px;
+  z-index: 1;
+}
+.cell.is-open { cursor: default; }
+.cell.is-today-open { z-index: 5; }  /* стулки поточного дня лягають поверх сусідів */
+.cell.is-open:not(.is-today-open) .leaf { display: none; }
+.cell-trigger {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.cell-trigger[hidden] { display: none; }
+.cell.is-locked .cell-trigger { cursor: not-allowed; }
+.cell-trigger:focus-visible, .inside-text a:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+/* Внутрішня частина (видно після відкриття) */
+.inside {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  text-align: center;
+  background: var(--red-inside);
+  box-shadow: inset 0 10px 18px rgba(40, 8, 10, 0.45);
+}
+.inside::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(244, 213, 141, 0.55);
+  pointer-events: none;
+}
+.inside-content {
+  position: relative;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  opacity: 0;
+  transform: translateY(10px) scale(0.85);
+  transition: opacity .5s ease, transform .7s cubic-bezier(0.2, 0.8, 0.2, 1.3);
+}
+.cell.is-open .inside-content {
+  opacity: 1;
+  transform: none;
+  transition-delay: var(--reveal-delay);
+}
+.inside-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--cream);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.inside-text a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
+.inside-figure {
+  position: relative;
+  margin: 0;
+  width: 80px;
+  height: 52px;
+  overflow: hidden;
+  border: 2px solid var(--gold);
+  background: var(--kraft);
+}
+.inside-figure img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cell.is-wide .inside-figure { width: 110px; }
+.cell.is-image .inside-text { font-size: 12px; }
+
+/* ---------- Стулки ---------- */
+.leaf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  transform-style: preserve-3d;
+  transition: transform var(--door-duration) var(--door-ease);
+  pointer-events: none;
+}
+.leaf--left  { left: 0;  transform-origin: left center; }
+.leaf--right { right: 0; transform-origin: right center; transition-delay: .06s; }
+
+.cell.is-wide, .cell.is-big { --door-angle: 105deg; }   /* широкі стулки відкриваються менше, щоб не залазити далеко на сусідів */
+.cell.is-today-open .leaf--left  { transform: rotateY(calc(var(--door-angle) * -1)); }
+.cell.is-today-open .leaf--right { transform: rotateY(var(--door-angle)); }
+
+/* легкий «натяк» при наведенні на закрите віконце */
+@media (hover: hover) {
+  .cell:not(.is-open):hover .leaf--left  { transform: rotateY(-7deg); }
+  .cell:not(.is-open):hover .leaf--right { transform: rotateY(7deg); }
+}
+
+.leaf-front,
+.leaf-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.leaf-front { overflow: hidden; }
+.leaf-back {
+  transform: rotateY(180deg);
+  background: var(--kraft-edge);
+  border: 1px solid var(--kraft-edge-dark);
+}
+.leaf-back::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Лицьова сторона: одна картинка на всю ширину віконця, кожна стулка показує свою половину */
+.face {
+  position: absolute;
+  top: 0;
+  width: 200%;
+  height: 100%;
+  background: var(--kraft);
+  border: 1px solid var(--kraft-edge);
+  font-family: var(--font-display);
+  color: var(--red);
+}
+.leaf--left  .face { left: 0; }
+.leaf--right .face { left: -100%; }
+.art { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.inside-figure .art { position: absolute; }
+
+.face-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 12px;
+  font-size: 50px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+/* шов і золоті ручки */
+.seam { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(120, 70, 40, 0.45); }
+.knob {
+  position: absolute;
+  top: 72%;               /* нижче центру, щоб не перекривати цифру */
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 1px 2px rgba(74, 46, 28, 0.4);
+}
+.leaf--left  .seam { right: 0; }
+.leaf--left  .knob { right: 6px; }
+.leaf--right .seam { left: 0; }
+.leaf--right .knob { left: 6px; }
+
+/* Великі віконця (25, 31) */
+.cell.is-big .face-num { font-size: 108px; padding-bottom: 24px; }
+.cell.is-big.day-31 .face-num { font-size: 124px; }
+.cell.is-big .inside-text { font-size: 20px; }
+.cell.is-big .inside-figure { width: 220px; height: 150px; }
+
+/* Заблоковані майбутні дні (якщо lockFutureDays = true) */
+.cell.is-locked { cursor: not-allowed; }
+.cell.is-shaking { animation: shake .45s ease;}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+.toast {
+  position: fixed;
+  z-index: 99;
+  left: 50%;
+  bottom: 24px;
+  transform: translate(-50%, 20px);
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: var(--red-dark);
+  color: #FFFFFF;
+  font-weight: 600;
+  font-size: 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+}
+.toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- Мобільна версія ---------- */
+@media (max-width: 720px) {
+  :root { --cols: 3; --row-h: 118px; --gap: 10px; }
+  .page { padding: 14px 14px 48px; }
+  .board { padding: 12px; }
+  .grid { grid-auto-flow: dense; }
+  .cell { grid-column: auto !important; grid-row: auto !important; }
+  .cell.is-big { grid-column: span 2 !important; grid-row: span 2 !important; }
+  /* вміст усередині вужчих віконець */
+  .inside { padding: 8px; }
+  .inside-text { font-size: 13px; }
+  .cell.is-image .inside-text { font-size: 11px; line-height: 1.25; }
+  .inside-figure, .cell.is-wide .inside-figure { width: 64px; height: 42px; }
+  .cell.is-big .inside-figure { width: 160px; height: 104px; }
+  .cell.is-big .inside-text { font-size: 16px; }
+}
+
+@media (max-width: 600px) {
+  :root { --cols: 2; --row-h: 132px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
